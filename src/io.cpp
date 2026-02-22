@@ -502,7 +502,13 @@ GeneratedPipelineInput::GeneratedPipelineInput(const Catalog &catalog,
                                                int falseStarMinMagnitude,
                                                int falseStarMaxMagnitude,
                                                int cutoffMag,
-                                               decimal perturbationStddev)
+                                               decimal perturbationStddev,
+                                               //obstruction
+                                               decimal obstructSize, //Wanhao changes about obstruction
+                                               bool obstructRandomSize,
+                                               decimal obstructBrightness,
+                                               bool obstructRandomBrightness,
+                                               int obstruct)
     : camera(camera), attitude(attitude), catalog(catalog) {
 
     assert(falseStarMaxMagnitude <= falseStarMinMagnitude);
@@ -526,10 +532,15 @@ GeneratedPipelineInput::GeneratedPipelineInput(const Catalog &catalog,
     // attitude 1 time unit after middle of exposure
     Quaternion futureAttitude = motionBlurDirectionQ*currentAttitude;
     std::vector<GeneratedStar> generatedStars;
+    // Obstruction part 1: vector of obstructions, and initialize new spread
+    std::vector<GeneratedStar> generatedObs;
+    decimal obsSpreadStdDev = starSpreadStdDev * obstructSize;
 
     // a star with 1 photon has peak density 1/(2pi sigma^2), because 2d gaussian formula. Then just
     // multiply up proportionally!
     decimal zeroMagPeakPhotonDensity = zeroMagTotalPhotons / (2*DECIMAL_M_PI * starSpreadStdDev*starSpreadStdDev);
+
+    // We dont need new density for obstruction unless we want it to be changed!
 
     // TODO: Is it 100% correct to just copy the standard deviation in both dimensions?
     std::normal_distribution<decimal> perturbation1DDistribution(DECIMAL(0.0), perturbationStddev);
@@ -543,8 +554,22 @@ GeneratedPipelineInput::GeneratedPipelineInput(const Catalog &catalog,
         // to be uniform around sphere. Borel-Kolmogorov paradox is calling
         decimal de = DECIMAL_ASIN(uniformDistribution(*rng)*2 - 1);
         decimal magnitude = magnitudeDistribution(*rng);
-
+        // Wanhao note: modify any false stars here
         catalogWithFalse.push_back(CatalogStar(ra, de, magnitude, -1));
+    }
+    
+    // Obstruction part 2: Toss the obstructions in catalogWithFalse for now, named -2
+    for (int i = 0; i < obstruct; i++) {
+        // Same as the false stars generation, ra de are position
+        decimal ra = uniformDistribution(*rng) * 2*DECIMAL_M_PI;
+        decimal de = DECIMAL_ASIN(uniformDistribution(*rng)*2 - 1);
+        if (obstructRandomBrightness) {
+            decimal magnitude = magnitudeDistribution(*rng);
+            catalogWithFalse.push_back(CatalogStar(ra, de, magnitude, -2)); //name -2 means obstruction
+        } else {
+            // fixed large magnitude for obstruction
+            catalogWithFalse.push_back(CatalogStar(ra, de, 1/obstructBrightness, -2)); //name -2 means obstruction
+        }
     }
 
     for (int i = 0; i < (int)catalogWithFalse.size(); i++) {
@@ -570,14 +595,21 @@ GeneratedPipelineInput::GeneratedPipelineInput(const Catalog &catalog,
             // inverse of the function defining the Gaussian distribution: Find out how far from the
             // mean we'll have to go until the number of photons is less than interestingThreshold
             decimal radius = DECIMAL_CEIL(DECIMAL_SQRT(-DECIMAL_LOG(interestingThreshold/peakBrightnessPerTime/exposureTime)*2*DECIMAL_M_PI*starSpreadStdDev*starSpreadStdDev));
-            Star star = Star(camCoords.x, camCoords.y,
+            // Obstruction part 3: Modified radius, then let the obstruction enter the generatedObs
+            Star star;
+            if (catalogStar.name == -2) {
+                radius = DECIMAL_CEIL(DECIMAL_SQRT(-DECIMAL_LOG(interestingThreshold/peakBrightnessPerTime/exposureTime)*2*DECIMAL_M_PI*obsSpreadStdDev*obsSpreadStdDev));
+                star = Star(camCoords.x, camCoords.y, radius, radius, -catalogStar.magnitude);
+                generatedObs.push_back(GeneratedStar(star, peakBrightnessPerTime, delta));
+            } else {
+                star = Star(camCoords.x, camCoords.y,
                              radius, radius,
                              // important to invert magnitude here, so that centroid magnitude becomes larger for brighter stars.
                              // It's possible to make it so that the magnitude is always positive too, but allowing weirder magnitudes helps keep star-id algos honest about their assumptions on magnitude.
                              // we don't use its magnitude anywhere else in generation; peakBrightness was already calculated.
                              -catalogStar.magnitude);
-            generatedStars.push_back(GeneratedStar(star, peakBrightnessPerTime, delta));
-
+                generatedStars.push_back(GeneratedStar(star, peakBrightnessPerTime, delta));
+            }
             // Now add the star to the input and expected lists.
             // We do actually want to add false stars as well, because:
             // a) A centroider isn't any worse because it picks up a false star that looks exactly like a normal star, so why should we exclude them from compare-centroids?
@@ -669,6 +701,58 @@ GeneratedPipelineInput::GeneratedPipelineInput(const Catalog &catalog,
         }
     }
 
+    // Obstruction part 4: rerun the render for the generated obstructs, most copy and past since line 650
+    for (const GeneratedStar &star : generatedObs) {
+        // delta will be exactly (0,0) when motion blur disabled
+        Vec2 earliestPosition = star.position - star.delta*(exposureTime/DECIMAL(2.0) + readoutTime/DECIMAL(2.0));
+        Vec2 latestPosition = star.position + star.delta*(exposureTime/DECIMAL(2.0) + readoutTime/DECIMAL(2.0));
+        int xMin = std::max(0, (int)std::min(earliestPosition.x - star.radiusX, latestPosition.x - star.radiusX));
+        int xMax = std::min(image.width-1, (int)std::max(earliestPosition.x + star.radiusX, latestPosition.x + star.radiusX));
+        int yMin = std::max(0, (int)std::min(earliestPosition.y - star.radiusX, latestPosition.y - star.radiusX));
+        int yMax = std::min(image.height-1, (int)std::max(earliestPosition.y + star.radiusX, latestPosition.y + star.radiusX));
+
+        // peak brightness is measured in photons per time unit per pixel, so if oversampling, we
+        // need to convert units to photons per time unit per sample
+        decimal oversamplingBrightnessFactor = oversamplingPerAxis*oversamplingPerAxis;
+
+        // the star.x and star.y refer to the pixel whose top left corner the star should appear at
+        // (and fractional amounts are relative to the corner). When we color a pixel, we ideally
+        // would integrate the intensity of the star over that pixel, but we can make do by sampling
+        // the intensity of the star at the /center/ of the pixel, ie, star.x+.5 and star.y+.5
+        for (int xPixel = xMin; xPixel <= xMax; xPixel++) {
+            for (int yPixel = yMin; yPixel <= yMax; yPixel++) {
+                // offset of beginning & end of readout compared to beginning & end of readout for
+                // center row
+                decimal readoutOffset = readoutTime * (yPixel - image.height/DECIMAL(2.0)) / image.height;
+                decimal tStart = -exposureTime/DECIMAL(2.0) + readoutOffset;
+                decimal tEnd = exposureTime/DECIMAL(2.0) + readoutOffset;
+
+                // loop through all samples in the current pixel
+                for (int xSample = 0; xSample < oversamplingPerAxis; xSample++) {
+                    for (int ySample = 0; ySample < oversamplingPerAxis; ySample++) {
+                        decimal x = xPixel + (xSample+DECIMAL(0.5))/oversamplingPerAxis;
+                        decimal y = yPixel + (ySample+DECIMAL(0.5))/oversamplingPerAxis;
+
+                        decimal curPhotons;
+                        if (motionBlurEnabled) {
+                            curPhotons =
+                                (MotionBlurredPixelBrightness({x, y}, star, tEnd, obsSpreadStdDev)
+                                 - MotionBlurredPixelBrightness({x, y}, star, tStart, obsSpreadStdDev))
+                                / oversamplingBrightnessFactor;
+                        } else {
+                            curPhotons = StaticPixelBrightness({x, y}, star, exposureTime, obsSpreadStdDev)
+                                / oversamplingBrightnessFactor;
+                        }
+
+                        assert(DECIMAL(0.0) <= curPhotons);
+
+                        photonsBuffer[xPixel + yPixel*image.width] += curPhotons;
+                    }
+                }
+            }
+        }
+    }
+
     std::normal_distribution<decimal> readNoiseDist(DECIMAL(0.0), readNoiseStdDev);
 
     // convert from photon counts to observed pixel brightnesses, applying noise and such.
@@ -734,11 +818,13 @@ static Attitude RandomAttitude(std::default_random_engine* pReng) {
 PipelineInputList GetGeneratedPipelineInput(const PipelineOptions &values) {
     // TODO: prompt for attitude, imagewidth, etc and then construct a GeneratedPipelineInput
 
-    int seed;
+    uint64_t seed;
 
     // time based seed if option specified
     if (values.timeSeed) {
         seed = time(0);
+    } else if (values.advSeed){
+        seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     } else {
         seed = values.generateSeed;
     }
@@ -790,7 +876,12 @@ PipelineInputList GetGeneratedPipelineInput(const PipelineOptions &values) {
                 (values.generateFalseMinMag * 100),
                 (values.generateFalseMaxMag * 100),
                 (values.generateCutoffMag * 100),
-                values.generatePerturbationStddev);
+                values.generatePerturbationStddev,
+                values.generateO_size,
+                values.generateO_randomSize,
+                values.generateO_brightness,
+                values.generateO_randomBrightness,
+                values.generateO);
 
             result.push_back(std::unique_ptr<PipelineInput>(curr));
 

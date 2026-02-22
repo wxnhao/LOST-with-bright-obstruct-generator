@@ -36,10 +36,8 @@ class UserSpecifiedOutputStream {
 public:
     explicit UserSpecifiedOutputStream(std::string filePath, bool isBinary);
     ~UserSpecifiedOutputStream();
-
     /// return the inner output stream, suitable for use with <<
     std::ostream &Stream() { return *stream; };
-
 private:
     bool isFstream;
     std::ostream *stream;
@@ -133,7 +131,12 @@ public:
                            bool shotNoise, int oversampling,
                            int numFalseStars, int falseMinMagnitude, int falseMaxMagnitude,
                            int cutoffMag,
-                           decimal perturbationStddev);
+                           decimal perturbationStddev,
+                           decimal obstructSize, //Wanhao changes about obstruction
+                           bool obstructRandomSize,
+                           decimal obstructBrightness,
+                           bool obstructRandomBrightness,
+                           int obstruct);
 
 
     const Image *InputImage() const override { return &image; };
