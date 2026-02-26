@@ -581,24 +581,34 @@ GeneratedPipelineInput::GeneratedPipelineInput(const Catalog &catalog,
             continue;
         }
         Vec2 camCoords = camera.SpatialToCamera(rotated);
-
-        if (camera.InSensor(camCoords)) {
+        // radiant intensity, in photons per time unit per pixel, at the center of the star.
+        decimal peakBrightnessPerTime = zeroMagPeakPhotonDensity * MagToBrightness(catalogStar.magnitude);
+        decimal interestingThreshold = DECIMAL(0.05); // we don't need to check pixels that are expected to
+                                               // receive this many photons or fewer.
+        // inverse of the function defining the Gaussian distribution: Find out how far from the
+        // mean we'll have to go until the number of photons is less than interestingThreshold
+        decimal radius = DECIMAL_CEIL(DECIMAL_SQRT(-DECIMAL_LOG(interestingThreshold/peakBrightnessPerTime/exposureTime)*2*DECIMAL_M_PI*starSpreadStdDev*starSpreadStdDev));
+        // Obstruction part 3.1: Modified radius
+        if (catalogStar.name == -2) {
+            radius = DECIMAL_CEIL(DECIMAL_SQRT(-DECIMAL_LOG(interestingThreshold/peakBrightnessPerTime/exposureTime)*2*DECIMAL_M_PI*obsSpreadStdDev*obsSpreadStdDev));
+        }
+        // Obstruction part 3.2: Allowing render of star as long as part of it is in camera, including large obstruction partially in camera
+        if ((camCoords.x + radius >= 0 && camCoords.x - radius < camera.XResolution()) && (camCoords.y + radius >= 0 && camCoords.y - radius < camera.YResolution())) {
             Vec3 futureSpatial = futureAttitude.Rotate(catalogWithFalse[i].spatial);
             Vec2 delta = camera.SpatialToCamera(futureSpatial) - camCoords;
             if (!motionBlurEnabled) {
                 delta = {0, 0}; // avoid decimaling point funny business
             }
-            // radiant intensity, in photons per time unit per pixel, at the center of the star.
-            decimal peakBrightnessPerTime = zeroMagPeakPhotonDensity * MagToBrightness(catalogStar.magnitude);
-            decimal interestingThreshold = DECIMAL(0.05); // we don't need to check pixels that are expected to
-                                               // receive this many photons or fewer.
-            // inverse of the function defining the Gaussian distribution: Find out how far from the
-            // mean we'll have to go until the number of photons is less than interestingThreshold
-            decimal radius = DECIMAL_CEIL(DECIMAL_SQRT(-DECIMAL_LOG(interestingThreshold/peakBrightnessPerTime/exposureTime)*2*DECIMAL_M_PI*starSpreadStdDev*starSpreadStdDev));
-            // Obstruction part 3: Modified radius, then let the obstruction enter the generatedObs
+            // // radiant intensity, in photons per time unit per pixel, at the center of the star.
+            // decimal peakBrightnessPerTime = zeroMagPeakPhotonDensity * MagToBrightness(catalogStar.magnitude);
+            // decimal interestingThreshold = DECIMAL(0.05); // we don't need to check pixels that are expected to
+            //                                    // receive this many photons or fewer.
+            // // inverse of the function defining the Gaussian distribution: Find out how far from the
+            // // mean we'll have to go until the number of photons is less than interestingThreshold
+            // decimal radius = DECIMAL_CEIL(DECIMAL_SQRT(-DECIMAL_LOG(interestingThreshold/peakBrightnessPerTime/exposureTime)*2*DECIMAL_M_PI*starSpreadStdDev*starSpreadStdDev));
+            // Obstruction part 3.3: let the obstruction enter the generatedObs
             Star star;
             if (catalogStar.name == -2) {
-                radius = DECIMAL_CEIL(DECIMAL_SQRT(-DECIMAL_LOG(interestingThreshold/peakBrightnessPerTime/exposureTime)*2*DECIMAL_M_PI*obsSpreadStdDev*obsSpreadStdDev));
                 star = Star(camCoords.x, camCoords.y, radius, radius, -catalogStar.magnitude);
                 generatedObs.push_back(GeneratedStar(star, peakBrightnessPerTime, delta));
             } else {
