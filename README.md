@@ -1,9 +1,5 @@
 New flags/commands so far!!
 
-—generate-obstructInFrame
-
-   Gurantees to generate in frame
-
 —generate-advanced-seed      
 
     *Nano timed based seed that is better for mass testing*
@@ -11,6 +7,10 @@ New flags/commands so far!!
 —generate-obstruct
 
 *Enables obstructions, and how many obstructions*
+
+—generate-obstructInFrame
+
+   Gurantees to generate in frame
 
 —generate-obstructRandomSize
 
@@ -27,3 +27,4 @@ Enable if we want random. Disable if constant brightnesses for all?
 —generate-obstructBrightness
 
  We will see? something that controls brightness limits
+
