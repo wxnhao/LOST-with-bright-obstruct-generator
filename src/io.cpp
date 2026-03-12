@@ -508,7 +508,8 @@ GeneratedPipelineInput::GeneratedPipelineInput(const Catalog &catalog,
                                                bool obstructRandomSize,
                                                decimal obstructBrightness,
                                                bool obstructRandomBrightness,
-                                               int obstruct)
+                                               int obstruct,
+                                               bool obstructInFrame)
     : camera(camera), attitude(attitude), catalog(catalog) {
 
     assert(falseStarMaxMagnitude <= falseStarMinMagnitude);
@@ -560,9 +561,14 @@ GeneratedPipelineInput::GeneratedPipelineInput(const Catalog &catalog,
     
     // Obstruction part 2: Toss the obstructions in catalogWithFalse for now, named -2
     for (int i = 0; i < obstruct; i++) {
-        // Same as the false stars generation, ra de are position
+        // Same as the false stars generation, ra de are attitude
         decimal ra = uniformDistribution(*rng) * 2*DECIMAL_M_PI;
         decimal de = DECIMAL_ASIN(uniformDistribution(*rng)*2 - 1);
+        if (obstructInFrame) {
+            // Don't matter since we are randomizing base on camera, experimental
+            ra = 1;
+            de = 1;
+        }
         if (obstructRandomBrightness) {
             decimal magnitude = magnitudeDistribution(*rng);
             catalogWithFalse.push_back(CatalogStar(ra, de, magnitude, -2)); //name -2 means obstruction
@@ -571,13 +577,14 @@ GeneratedPipelineInput::GeneratedPipelineInput(const Catalog &catalog,
             catalogWithFalse.push_back(CatalogStar(ra, de, 1/obstructBrightness, -2)); //name -2 means obstruction
         }
     }
-
+    int tester = 0;
     for (int i = 0; i < (int)catalogWithFalse.size(); i++) {
         bool isTrueStar = i < (int)catalog.size();
-
         const CatalogStar &catalogStar = catalogWithFalse[i];
         Vec3 rotated = attitude.Rotate(catalogWithFalse[i].spatial);
-        if (rotated.x <= 0) {
+        // Obstruction part 3.01: Since we give guranteed in frame obstruction assigned random postion later,
+        // we dont mind it being behind camera, so we skip the check for in frame obstruction here
+        if (rotated.x <= 0 && !(catalogStar.name == -2 && obstructInFrame)) {
             continue;
         }
         Vec2 camCoords = camera.SpatialToCamera(rotated);
@@ -592,8 +599,9 @@ GeneratedPipelineInput::GeneratedPipelineInput(const Catalog &catalog,
         if (catalogStar.name == -2) {
             radius = DECIMAL_CEIL(DECIMAL_SQRT(-DECIMAL_LOG(interestingThreshold/peakBrightnessPerTime/exposureTime)*2*DECIMAL_M_PI*obsSpreadStdDev*obsSpreadStdDev));
         }
-        // Obstruction part 3.2: Allowing render of star as long as part of it is in camera, including large obstruction partially in camera
-        if ((camCoords.x + radius >= 0 && camCoords.x - radius < camera.XResolution()) && (camCoords.y + radius >= 0 && camCoords.y - radius < camera.YResolution())) {
+        // Obstruction part 3.2: Allowing render of star as long as part of it is in camera, including large obstruction partially in camera 
+        // OR an obstruction that is guranteed to be in frame
+        if (((camCoords.x + radius >= 0 && camCoords.x - radius < camera.XResolution()) && (camCoords.y + radius >= 0 && camCoords.y - radius < camera.YResolution())) || (catalogStar.name == -2 && obstructInFrame)) {
             Vec3 futureSpatial = futureAttitude.Rotate(catalogWithFalse[i].spatial);
             Vec2 delta = camera.SpatialToCamera(futureSpatial) - camCoords;
             if (!motionBlurEnabled) {
@@ -609,7 +617,22 @@ GeneratedPipelineInput::GeneratedPipelineInput(const Catalog &catalog,
             // Obstruction part 3.3: let the obstruction enter the generatedObs
             Star star;
             if (catalogStar.name == -2) {
-                star = Star(camCoords.x, camCoords.y, radius, radius, -catalogStar.magnitude);
+                if (!obstructInFrame) {
+                    // generating obstruction in random position in the sky, so same generation method as false stars
+                    star = Star(camCoords.x, camCoords.y, radius, radius, -catalogStar.magnitude);
+                } else {
+                    // in frame obstruction generation
+                    // ifx and ify spread from -radius to camera resolution + radius,
+                    // so obstruct could be anywhere as long as part of it is in frame
+                    // double ifx = uniformDistribution(*rng)*(camera.XResolution() + 2*radius/2) - radius/2;
+                    // double ify = uniformDistribution(*rng)*(camera.YResolution() + 2*radius/2) - radius/2;
+                    double ifx = uniformDistribution(*rng)*(camera.XResolution());
+                    double ify = uniformDistribution(*rng)*(camera.YResolution());
+                    std::cout << "Generating obstruction in frame at position (" << ifx << ", " << ify << ") with radius " << radius << std::endl;
+                    std::cout << tester << std::endl;
+                    tester++;
+                    star = Star(ifx, ify, radius, radius, -catalogStar.magnitude);
+                }
                 generatedObs.push_back(GeneratedStar(star, peakBrightnessPerTime, delta));
             } else {
                 star = Star(camCoords.x, camCoords.y,
@@ -891,7 +914,8 @@ PipelineInputList GetGeneratedPipelineInput(const PipelineOptions &values) {
                 values.generateO_randomSize,
                 values.generateO_brightness,
                 values.generateO_randomBrightness,
-                values.generateO);
+                values.generateO,
+                values.generateO_inFrame);
 
             result.push_back(std::unique_ptr<PipelineInput>(curr));
 

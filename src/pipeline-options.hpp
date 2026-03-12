@@ -59,6 +59,7 @@ LOST_CLI_OPTION("generate-obstructRandomBrightness" , bool    , generateO_random
 LOST_CLI_OPTION("generate-obstructBrightness"       , decimal , generateO_brightness, 1     , STR_TO_DECIMAL(optarg)    , 10000)
 LOST_CLI_OPTION("generate-obstructSize"       , decimal     , generateO_size            , 1     , STR_TO_DECIMAL(optarg)    , 1)
 LOST_CLI_OPTION("generate-obstruct"           , int     , generateO                 , 0     , atoi(optarg) , 1)
+LOST_CLI_OPTION("generate-obstructInFrame"    , bool    , generateO_inFrame         , false  , atobool(optarg) , true)
 LOST_CLI_OPTION("generate-x-resolution"       , int     , generateXRes              , 1024  , atoi(optarg)    , kNoDefaultArgument)
 LOST_CLI_OPTION("generate-y-resolution"       , int     , generateYRes              , 1024  , atoi(optarg)    , kNoDefaultArgument)
 LOST_CLI_OPTION("generate-centroids-only"     , bool    , generateCentroidsOnly     , false , atobool(optarg) , true)

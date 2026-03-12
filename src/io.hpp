@@ -136,7 +136,8 @@ public:
                            bool obstructRandomSize,
                            decimal obstructBrightness,
                            bool obstructRandomBrightness,
-                           int obstruct);
+                           int obstruct,
+                           bool obstructInFrame);
 
 
     const Image *InputImage() const override { return &image; };
