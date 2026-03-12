@@ -26,5 +26,5 @@ Enable if we want random. Disable if constant brightnesses for all?
 
 —generate-obstructBrightness
 
- We will see? something that controls brightness limits
+We will see? something that controls brightness limits
 
