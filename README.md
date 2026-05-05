@@ -4,7 +4,7 @@ New flags/commands so far!!
 
     *Nano timed based seed that is better for mass testing*
 
-—generate-obstruct
+—generate-obstruct (int)
 
 *Enables obstructions, and how many obstructions*
 
@@ -16,15 +16,15 @@ New flags/commands so far!!
 
 Enable if we want random for obstructs. 
 
-—generate-obstructSize
+—generate-obstructSize (dec)
 
 Multiplier to spread and log(photon) for sizing
 
-—generate-obstructRandomBrightness
+—generate-obstructRandomBrightness 
 
 Enable if we want random. Disable if constant brightnesses for all?
 
-—generate-obstructBrightness
+—generate-obstructBrightness (dec)
 
 We will see? something that controls brightness limits
 
