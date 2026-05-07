@@ -12,19 +12,22 @@ New flags/commands so far!!
 
    Gurantees to generate in frame
 
-—generate-obstructRandomSize
-
-Enable if we want random for obstructs. 
-
 —generate-obstructSize (dec)
 
 Multiplier to spread and log(photon) for sizing
 
 —generate-obstructRandomBrightness 
 
-Enable if we want random. Disable if constant brightnesses for all?
+Enable if we want random. Disable if constant brightnesses for all
+
+
+EXPIRIMENTAL ONES
 
 —generate-obstructBrightness (dec)
 
-We will see? something that controls brightness limits
+Set the brightness of obstruct... NOT VERY GOOD as this just modifies the magnitude of obstruction as of right now
+
+—generate-obstructRandomSize
+
+Enable if we want random for obstructs. Dont use this rn :3
 
