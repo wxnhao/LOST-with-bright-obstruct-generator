@@ -632,6 +632,11 @@ GeneratedPipelineInput::GeneratedPipelineInput(const Catalog &catalog,
                     std::cout << tester << std::endl;
                     tester++;
                     star = Star(ifx, ify, radius, radius, -catalogStar.magnitude);
+                    // if (obstructRandomSize) {
+                    //     int i = uniformDistribution(*rng);
+                    //     star.radiusX = i*radius;
+                    //     star.radiusY = i*radius;
+                    // }
                 }
                 generatedObs.push_back(GeneratedStar(star, peakBrightnessPerTime, delta));
             } else {
@@ -767,6 +772,11 @@ GeneratedPipelineInput::GeneratedPipelineInput(const Catalog &catalog,
                         decimal y = yPixel + (ySample+DECIMAL(0.5))/oversamplingPerAxis;
 
                         decimal curPhotons;
+                        // Obstruction part 4.1: a very simple random size modifier
+                        if (obstructRandomSize) {
+                            // reset each time to a new random size
+                            obsSpreadStdDev = uniformDistribution(*rng) * starSpreadStdDev * obstructSize;
+                        }
                         if (motionBlurEnabled) {
                             curPhotons =
                                 (MotionBlurredPixelBrightness({x, y}, star, tEnd, obsSpreadStdDev)

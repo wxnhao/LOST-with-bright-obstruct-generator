@@ -54,12 +54,6 @@ LOST_CLI_OPTION("compare-attitudes"         , std::string, compareAttitudes     
 
 // IMAGE GENERATION
 LOST_CLI_OPTION("generate"                    , int     , generate                  , 0     , atoi(optarg)    , 1)
-LOST_CLI_OPTION("generate-obstructRandomSize" , bool    , generateO_randomSize, false     , atobool(optarg)    , true)
-LOST_CLI_OPTION("generate-obstructRandomBrightness" , bool    , generateO_randomBrightness, false     , atobool(optarg)    , true)
-LOST_CLI_OPTION("generate-obstructBrightness"       , decimal , generateO_brightness, 1     , STR_TO_DECIMAL(optarg)    , 10000)
-LOST_CLI_OPTION("generate-obstructSize"       , decimal     , generateO_size            , 1     , STR_TO_DECIMAL(optarg)    , 1)
-LOST_CLI_OPTION("generate-obstruct"           , int     , generateO                 , 0     , atoi(optarg) , 1)
-LOST_CLI_OPTION("generate-obstructInFrame"    , bool    , generateO_inFrame         , false  , atobool(optarg) , true)
 LOST_CLI_OPTION("generate-x-resolution"       , int     , generateXRes              , 1024  , atoi(optarg)    , kNoDefaultArgument)
 LOST_CLI_OPTION("generate-y-resolution"       , int     , generateYRes              , 1024  , atoi(optarg)    , kNoDefaultArgument)
 LOST_CLI_OPTION("generate-centroids-only"     , bool    , generateCentroidsOnly     , false , atobool(optarg) , true)
@@ -87,3 +81,11 @@ LOST_CLI_OPTION("generate-cutoff-mag"         , decimal , generateCutoffMag     
 LOST_CLI_OPTION("generate-seed"               , uint64_t , generateSeed              , 394859, atoll(optarg)    , kNoDefaultArgument) //Wanhao Change: original was int, now int 64, this is default
 LOST_CLI_OPTION("generate-time-based-seed"    , bool    , timeSeed                  , false , atobool(optarg) , true)
 LOST_CLI_OPTION("generate-advanced-seed"      , bool    , advSeed                   , false , atobool(optarg) , true) // Advanced seed option for accurate RNG, especially for mass testing
+
+// Obstruction generation
+LOST_CLI_OPTION("generate-obstruct"                 , int     , generateO                   , 0         , atoi(optarg) , 1)
+LOST_CLI_OPTION("generate-obstructInFrame"          , bool    , generateO_inFrame           , false     , atobool(optarg) , true)
+LOST_CLI_OPTION("generate-obstructRandomSize"       , bool    , generateO_randomSize        , false     , atobool(optarg)    , true)
+LOST_CLI_OPTION("generate-obstructRandomBrightness" , bool    , generateO_randomBrightness  , false     , atobool(optarg)    , true)
+LOST_CLI_OPTION("generate-obstructSize"             , decimal , generateO_size              , 10         , STR_TO_DECIMAL(optarg)    , kNoDefaultArgument)
+LOST_CLI_OPTION("generate-obstructBrightness"       , decimal , generateO_brightness        , 1         , STR_TO_DECIMAL(optarg)    , kNoDefaultArgument)
