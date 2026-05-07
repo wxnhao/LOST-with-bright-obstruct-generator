@@ -29,5 +29,5 @@ Set the brightness of obstruct... NOT VERY GOOD as this just modifies the magnit
 
 —generate-obstructRandomSize
 
-Enable if we want random for obstructs. Dont use this rn :3
+Enable if we want random size for obstructs. Dont use this rn :3
 
